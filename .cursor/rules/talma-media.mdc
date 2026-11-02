@@ -1,0 +1,35 @@
+---
+description: TALMA Drive Media Organizer — Laravel conventions and project defaults
+alwaysApply: true
+---
+
+# TALMA Media Organizer
+
+Build against [docs/PLAN.md](docs/PLAN.md). One chat per phase; start with "Read docs/PLAN.md, then…".
+
+## Stack
+
+- Laravel (latest), PHP 8 with `declare(strict_types=1);` in every PHP file
+- Livewire + Tailwind for UI (not Inertia/Vue)
+- Eloquent models and migrations for every database change
+- Queued jobs for anything slow (Drive sync, thumbnails, AI tagging)
+- Pest for tests
+- Secrets only in `.env` / Laravel Cloud env vars — never commit keys or service-account JSON
+
+## Product defaults
+
+- Staff login: Google via Socialite; enforce `@talmaisrael.com` on the server
+- All authenticated staff see all media (no folder ACLs in v1)
+- Tag taxonomy: English + Hebrew labels (`label_en`, `label_he`)
+- Manual tags always win; never overwrite `source = manual` or `status = rejected` on AI re-runs
+- Drive service account is Viewer only; do not write descriptions back to Drive in v1
+- Any logged-in staff can confirm/reject AI suggestions
+- Thumbnails are private; serve via auth-checked URLs or temporary signed URLs
+
+## Coding conventions
+
+- Prefer Artisan commands + jobs over fat controllers for sync/tagging
+- Validate AI JSON against the taxonomy before writing `media_tags`
+- Prefer `Storage` facade for thumbnails (private S3-compatible disk)
+- Schedule Drive change sync with `withoutOverlapping()` and `onOneServer()`
+- Keep privacy rules from PLAN.md: no individual identification, no public thumbnail links
