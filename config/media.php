@@ -54,4 +54,20 @@ return [
         'video/mpeg',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | AI tagging
+    |--------------------------------------------------------------------------
+    */
+
+    'ai' => [
+        'provider' => env('MEDIA_AI_PROVIDER', 'anthropic'),
+        'model' => env('MEDIA_AI_MODEL', 'claude-haiku-4-5-20251001'),
+        'prompt_version' => env('MEDIA_AI_PROMPT_VERSION', 'v1'),
+        'confidence_threshold' => (float) env('MEDIA_AI_CONFIDENCE_THRESHOLD', 0.7),
+        'vision_max_edge' => (int) env('MEDIA_AI_VISION_MAX_EDGE', 1600),
+        'rate_limit_per_minute' => (int) env('MEDIA_AI_RATE_LIMIT_PER_MINUTE', 20),
+        'timeout' => (int) env('MEDIA_AI_TIMEOUT', 90),
+    ],
+
 ];
