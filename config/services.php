@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
+        'allowed_email_domain' => env('ALLOWED_EMAIL_DOMAIN', 'talmaisrael.com'),
+        'service_account_json' => env('GOOGLE_SERVICE_ACCOUNT_JSON'),
+    ],
+
 ];

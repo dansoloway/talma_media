@@ -56,8 +56,19 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'private',
             'throw' => false,
             'report' => false,
+        ],
+
+        'thumbnails' => [
+            'driver' => env('THUMBNAILS_DRIVER', 'local'),
+            'root' => storage_path('app/private/thumbnails'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+            // When using S3 for thumbnails in production, set THUMBNAILS_DISK=s3
+            // and point media.thumbnails.disk at s3 instead of this disk.
         ],
 
     ],
