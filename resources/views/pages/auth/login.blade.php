@@ -1,8 +1,10 @@
 <x-layouts::auth :title="__('Log in')">
     <div class="flex flex-col gap-6">
-        <x-auth-header :title="__('Log in to your account')" :description="__('TALMA staff: use your @talmaisrael.com Google account')" />
+        <x-auth-header
+            :title="__('Welcome back')"
+            :description="__('Sign in with your @talmaisrael.com Google account')"
+        />
 
-        <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
 
         @if ($errors->any())
@@ -21,7 +23,7 @@
             {{ __('Continue with Google') }}
         </flux:button>
 
-        <div class="relative text-center text-sm text-zinc-500">
+        <div class="relative text-center text-sm text-talma-sea-deep/50">
             <span>{{ __('or use email') }}</span>
         </div>
 
@@ -30,7 +32,6 @@
         <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6">
             @csrf
 
-            <!-- Email Address -->
             <flux:input
                 name="email"
                 :label="__('Email address')"
@@ -39,10 +40,9 @@
                 required
                 autofocus
                 autocomplete="email"
-                placeholder="email@example.com"
+                placeholder="you@talmaisrael.com"
             />
 
-            <!-- Password -->
             <div class="relative">
                 <flux:input
                     name="password"
@@ -61,7 +61,6 @@
                 @endif
             </div>
 
-            <!-- Remember Me -->
             <flux:checkbox name="remember" :label="__('Remember me')" :checked="old('remember')" />
 
             <div class="flex items-center justify-end">
@@ -70,10 +69,5 @@
                 </flux:button>
             </div>
         </form>
-
-        <div class="space-x-1 text-sm text-center rtl:space-x-reverse text-zinc-600 dark:text-zinc-400">
-            <span>{{ __('Don\'t have an account?') }}</span>
-            <flux:link :href="route('register')" wire:navigate>{{ __('Sign up') }}</flux:link>
-        </div>
     </div>
 </x-layouts::auth>

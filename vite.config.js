@@ -13,8 +13,9 @@ export default defineConfig({
             ],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
+                // Closest widely available bilingual stand-in for Ping Hebrew
+                bunny('Heebo', {
+                    weights: [400, 500, 600, 700],
                 }),
             ],
         }),

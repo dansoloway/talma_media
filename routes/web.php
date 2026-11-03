@@ -5,9 +5,14 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\MediaDownloadController;
 use App\Http\Controllers\MediaThumbnailController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
+Route::get('/', function () {
+    return Auth::check()
+        ? redirect()->route('gallery')
+        : redirect()->route('login');
+})->name('home');
 
 Route::middleware('guest')->group(function () {
     Route::get('auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');

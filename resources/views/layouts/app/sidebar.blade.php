@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800">
-        <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
-            <flux:sidebar.header>
-                <x-app-logo :sidebar="true" href="{{ route('gallery') }}" wire:navigate />
+    <body class="min-h-screen bg-talma-sun text-talma-sand">
+        <flux:sidebar sticky collapsible="mobile" class="border-e border-talma-haze bg-white">
+            <flux:sidebar.header class="border-b border-talma-haze/80 py-3">
+                <x-app-logo :sidebar="true" href="{{ route('gallery') }}" />
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
@@ -26,12 +26,20 @@
 
             <flux:spacer />
 
-            <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
+            <div class="border-t border-talma-haze/80 px-2 py-3">
+                <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
+            </div>
         </flux:sidebar>
 
-        <!-- Mobile User Menu -->
-        <flux:header class="lg:hidden">
+        <flux:header class="border-b border-talma-haze bg-white lg:hidden">
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
+
+            <a href="{{ route('gallery') }}" class="ms-2 flex items-center gap-2" wire:navigate>
+                <span class="flex size-8 items-center justify-center overflow-hidden rounded-md bg-talma-sea-deep">
+                    <x-app-logo-icon class="size-8" />
+                </span>
+                <span class="text-sm font-bold text-talma-sea">TALMA</span>
+            </a>
 
             <flux:spacer />
 
