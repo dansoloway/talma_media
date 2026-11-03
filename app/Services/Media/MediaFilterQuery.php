@@ -89,6 +89,13 @@ final class MediaFilterQuery
                 ->whereDoesntHave('mediaTags', fn (Builder $q) => $q->where('status', 'suggested'));
         } elseif ($tagStatus === 'untagged') {
             $query->whereDoesntHave('mediaTags');
+        } elseif ($tagStatus === 'stale') {
+            $currentVersion = (string) config('media.ai.prompt_version');
+            $query->where('mime_type', 'like', 'image/%')
+                ->where(function (Builder $q) use ($currentVersion): void {
+                    $q->whereNull('prompt_version')
+                        ->orWhere('prompt_version', '!=', $currentVersion);
+                });
         }
 
         return $query->orderByDesc('taken_at')->orderByDesc('id');

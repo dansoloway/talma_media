@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Jobs\TagMedia;
 use App\Models\Media;
 use App\Models\MediaTag;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\Media\MediaFilterQuery;
 use Database\Seeders\TagTaxonomySeeder;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -68,4 +71,55 @@ it('serves thumbnails only to authenticated users', function () {
     $this->actingAs(User::factory()->create())
         ->get(route('media.thumbnail', $media))
         ->assertOk();
+});
+
+it('queues a re-tag job from the gallery detail', function () {
+    Queue::fake();
+    $user = User::factory()->create();
+    $media = Media::factory()->create(['mime_type' => 'image/jpeg']);
+
+    Livewire::actingAs($user)
+        ->test('pages::media.gallery')
+        ->call('openMedia', $media->id)
+        ->call('retagSelected')
+        ->assertSet('retagQueued', true);
+
+    Queue::assertPushed(TagMedia::class, fn (TagMedia $job): bool => $job->mediaId === $media->id);
+});
+
+it('filters outdated and untagged AI photos', function () {
+    config(['media.ai.prompt_version' => 'v2']);
+
+    $stale = Media::factory()->create([
+        'name' => 'stale.jpg',
+        'prompt_version' => 'v1',
+        'mime_type' => 'image/jpeg',
+    ]);
+    $current = Media::factory()->create([
+        'name' => 'current.jpg',
+        'prompt_version' => 'v2',
+        'mime_type' => 'image/jpeg',
+    ]);
+    $untagged = Media::factory()->create([
+        'name' => 'untagged.jpg',
+        'prompt_version' => null,
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    $ids = app(MediaFilterQuery::class)
+        ->build(['tag_status' => 'stale'])
+        ->pluck('id')
+        ->all();
+
+    expect($ids)->toContain($stale->id, $untagged->id)
+        ->and($ids)->not->toContain($current->id);
+
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::media.gallery')
+        ->set('tagStatus', 'stale')
+        ->assertSee('stale.jpg')
+        ->assertSee('untagged.jpg')
+        ->assertDontSee('current.jpg');
 });

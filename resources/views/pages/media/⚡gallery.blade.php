@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\TagMedia;
 use App\Models\Folder;
 use App\Models\Media;
 use App\Models\MediaTag;
@@ -53,9 +54,14 @@ new #[Title('Gallery')] class extends Component {
 
     public int $perPage = 24;
 
+    #[Url(as: 'media', except: null)]
     public ?int $selectedMediaId = null;
 
     public bool $showDetail = false;
+
+    public bool $retagQueued = false;
+
+    public bool $showAiRaw = false;
 
     /** @var list<int> */
     public array $selectedIds = [];
@@ -63,6 +69,13 @@ new #[Title('Gallery')] class extends Component {
     public string $bulkTagId = '';
 
     public string $addTagId = '';
+
+    public function mount(): void
+    {
+        if ($this->selectedMediaId !== null) {
+            $this->showDetail = true;
+        }
+    }
 
     public function updatedSearch(): void
     {
@@ -150,6 +163,8 @@ new #[Title('Gallery')] class extends Component {
     {
         $this->selectedMediaId = $mediaId;
         $this->addTagId = '';
+        $this->retagQueued = false;
+        $this->showAiRaw = false;
         $this->showDetail = true;
     }
 
@@ -157,12 +172,16 @@ new #[Title('Gallery')] class extends Component {
     {
         $this->selectedMediaId = null;
         $this->showDetail = false;
+        $this->retagQueued = false;
+        $this->showAiRaw = false;
     }
 
     public function updatedShowDetail(bool $value): void
     {
         if (! $value) {
             $this->selectedMediaId = null;
+            $this->retagQueued = false;
+            $this->showAiRaw = false;
         }
     }
 
@@ -213,6 +232,41 @@ new #[Title('Gallery')] class extends Component {
         Flux::toast(variant: 'success', text: __('Tag added.'));
     }
 
+    public function confirmAllSuggested(ManualTagService $manualTags): void
+    {
+        if ($this->selectedMediaId === null) {
+            return;
+        }
+
+        $media = Media::query()->findOrFail($this->selectedMediaId);
+        $count = $manualTags->confirmAllSuggested($media, Auth::user());
+        Flux::toast(variant: 'success', text: __(':count suggestions confirmed.', ['count' => $count]));
+    }
+
+    public function retagSelected(): void
+    {
+        if ($this->selectedMediaId === null) {
+            return;
+        }
+
+        $media = Media::query()->findOrFail($this->selectedMediaId);
+
+        if (! $media->isImage()) {
+            Flux::toast(variant: 'danger', text: __('Only photos can be AI-tagged.'));
+
+            return;
+        }
+
+        TagMedia::dispatch($media->id);
+        $this->retagQueued = true;
+        Flux::toast(variant: 'success', text: __('Re-tag queued. Run the queue worker if tags do not update.'));
+    }
+
+    public function toggleAiRaw(): void
+    {
+        $this->showAiRaw = ! $this->showAiRaw;
+    }
+
     public function applyBulkTag(ManualTagService $manualTags): void
     {
         if ($this->bulkTagId === '' || $this->selectedIds === []) {
@@ -251,8 +305,18 @@ new #[Title('Gallery')] class extends Component {
         }
 
         return Media::query()
-            ->with(['folder', 'mediaTags.tag.category'])
+            ->with([
+                'folder',
+                'mediaTags.tag.category',
+                'tagRuns' => fn ($q) => $q->latest()->limit(1),
+            ])
             ->find($this->selectedMediaId);
+    }
+
+    #[Computed]
+    public function currentPromptVersion(): string
+    {
+        return (string) config('media.ai.prompt_version');
     }
 
     #[Computed]
@@ -341,6 +405,7 @@ new #[Title('Gallery')] class extends Component {
             <flux:select.option value="suggested">{{ __('Has AI suggestions') }}</flux:select.option>
             <flux:select.option value="confirmed">{{ __('Confirmed only') }}</flux:select.option>
             <flux:select.option value="untagged">{{ __('Untagged') }}</flux:select.option>
+            <flux:select.option value="stale">{{ __('Outdated / untagged AI') }}</flux:select.option>
         </flux:select>
     </aside>
 
@@ -440,6 +505,17 @@ new #[Title('Gallery')] class extends Component {
                         </flux:text>
                     </div>
                     <div class="flex flex-wrap gap-2">
+                        @if ($media->isImage())
+                            <flux:button
+                                variant="primary"
+                                wire:click="retagSelected"
+                                wire:loading.attr="disabled"
+                                :disabled="$retagQueued"
+                                icon="arrow-path"
+                            >
+                                {{ $retagQueued ? __('Re-tag queued') : __('Re-tag') }}
+                            </flux:button>
+                        @endif
                         @if ($media->web_view_link)
                             <flux:button href="{{ $media->web_view_link }}" target="_blank" icon="arrow-top-right-on-square">
                                 {{ __('Open in Drive') }}
@@ -449,6 +525,20 @@ new #[Title('Gallery')] class extends Component {
                             {{ __('Download') }}
                         </flux:button>
                     </div>
+                </div>
+
+                @php($latestRun = $media->tagRuns->first())
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+                    <span>
+                        {{ __('Prompt') }}:
+                        {{ $media->prompt_version ?? __('none') }}
+                        @if (($media->prompt_version ?? null) !== $this->currentPromptVersion)
+                            <span class="text-amber-600 dark:text-amber-400">({{ __('current') }}: {{ $this->currentPromptVersion }})</span>
+                        @endif
+                    </span>
+                    @if ($latestRun)
+                        <span>{{ __('Model') }}: {{ $latestRun->model }} · {{ $latestRun->status }}</span>
+                    @endif
                 </div>
 
                 <div class="grid gap-4 lg:grid-cols-2">
@@ -469,7 +559,14 @@ new #[Title('Gallery')] class extends Component {
                         @endif
 
                         <div>
-                            <flux:heading size="sm">{{ __('Tags') }}</flux:heading>
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <flux:heading size="sm">{{ __('Tags') }}</flux:heading>
+                                @if ($media->mediaTags->contains(fn ($t) => $t->status === \App\Models\MediaTag::STATUS_SUGGESTED))
+                                    <flux:button size="sm" variant="ghost" wire:click="confirmAllSuggested">
+                                        {{ __('Confirm all suggested') }}
+                                    </flux:button>
+                                @endif
+                            </div>
                             <div class="mt-2 space-y-2">
                                 @forelse ($media->mediaTags->sortBy(fn ($t) => $t->tag->category->key.'-'.$t->tag->label_en) as $mediaTag)
                                     <div wire:key="tag-{{ $mediaTag->id }}" class="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-700">
@@ -510,6 +607,17 @@ new #[Title('Gallery')] class extends Component {
                             </flux:select>
                             <flux:button variant="primary" wire:click="addTagToSelectedMedia">{{ __('Add') }}</flux:button>
                         </div>
+
+                        @if ($media->ai_raw)
+                            <div>
+                                <flux:button size="sm" variant="ghost" wire:click="toggleAiRaw">
+                                    {{ $showAiRaw ? __('Hide AI raw JSON') : __('Show AI raw JSON') }}
+                                </flux:button>
+                                @if ($showAiRaw)
+                                    <pre class="mt-2 max-h-64 overflow-auto rounded-lg bg-zinc-950 p-3 text-xs text-zinc-100">{{ json_encode($media->ai_raw, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>

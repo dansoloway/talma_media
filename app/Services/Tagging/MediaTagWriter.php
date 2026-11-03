@@ -42,6 +42,8 @@ final class MediaTagWriter
                 'prompt_version' => $promptVersion,
             ])->save();
 
+            $keptTagIds = [];
+
             foreach ($validated['tags'] as $tag) {
                 $existing = MediaTag::query()
                     ->where('media_id', $media->id)
@@ -49,6 +51,8 @@ final class MediaTagWriter
                     ->first();
 
                 if ($existing !== null && $existing->isProtectedFromAiOverwrite()) {
+                    $keptTagIds[] = $tag['tag_id'];
+
                     continue;
                 }
 
@@ -68,7 +72,30 @@ final class MediaTagWriter
                         'by_user' => null,
                     ],
                 );
+
+                $keptTagIds[] = $tag['tag_id'];
             }
+
+            $this->pruneStaleAiTags($media, $keptTagIds);
         });
+    }
+
+    /**
+     * Remove unprotected AI tags that were not returned by the latest run.
+     *
+     * @param  list<int>  $keptTagIds
+     */
+    private function pruneStaleAiTags(Media $media, array $keptTagIds): void
+    {
+        $query = MediaTag::query()
+            ->where('media_id', $media->id)
+            ->where('source', MediaTag::SOURCE_AI)
+            ->where('status', '!=', MediaTag::STATUS_REJECTED);
+
+        if ($keptTagIds !== []) {
+            $query->whereNotIn('tag_id', array_values(array_unique($keptTagIds)));
+        }
+
+        $query->delete();
     }
 }

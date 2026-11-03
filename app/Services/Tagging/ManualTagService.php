@@ -66,4 +66,21 @@ final class ManualTagService
 
         return $count;
     }
+
+    public function confirmAllSuggested(Media $media, User $user): int
+    {
+        $count = 0;
+
+        $suggested = MediaTag::query()
+            ->where('media_id', $media->id)
+            ->where('status', MediaTag::STATUS_SUGGESTED)
+            ->get();
+
+        foreach ($suggested as $mediaTag) {
+            $this->confirm($mediaTag, $user);
+            $count++;
+        }
+
+        return $count;
+    }
 }

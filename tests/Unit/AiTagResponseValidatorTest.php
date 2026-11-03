@@ -116,3 +116,66 @@ it('never overwrites manual or rejected tags when writing AI results', function 
         ->and($lesson?->source)->toBe(MediaTag::SOURCE_AI)
         ->and($lesson?->status)->toBe(MediaTag::STATUS_CONFIRMED);
 });
+
+it('prunes unprotected AI tags absent from the latest response', function () {
+    $media = Media::query()->create([
+        'drive_file_id' => 'prune-file',
+        'name' => 'prune.jpg',
+        'mime_type' => 'image/jpeg',
+        'status' => Media::STATUS_ACTIVE,
+    ]);
+
+    $students = Tag::query()->where('value', 'students')->firstOrFail();
+    $classroom = Tag::query()->where('value', 'classroom')->firstOrFail();
+    $lesson = Tag::query()->where('value', 'lesson')->firstOrFail();
+    $outdoors = Tag::query()->where('value', 'outdoor')->firstOrFail();
+
+    MediaTag::query()->create([
+        'media_id' => $media->id,
+        'tag_id' => $students->id,
+        'source' => MediaTag::SOURCE_MANUAL,
+        'confidence' => 1,
+        'status' => MediaTag::STATUS_CONFIRMED,
+    ]);
+
+    MediaTag::query()->create([
+        'media_id' => $media->id,
+        'tag_id' => $classroom->id,
+        'source' => MediaTag::SOURCE_AI,
+        'confidence' => 0.9,
+        'status' => MediaTag::STATUS_CONFIRMED,
+    ]);
+
+    MediaTag::query()->create([
+        'media_id' => $media->id,
+        'tag_id' => $outdoors->id,
+        'source' => MediaTag::SOURCE_AI,
+        'confidence' => 0.6,
+        'status' => MediaTag::STATUS_SUGGESTED,
+    ]);
+
+    $validated = app(AiTagResponseValidator::class)->validate([
+        'caption' => 'Lesson indoors',
+        'tags' => [
+            ['category' => 'people', 'value' => 'students', 'confidence' => 0.5],
+            ['category' => 'activity', 'value' => 'lesson', 'confidence' => 0.9],
+        ],
+    ]);
+
+    app(MediaTagWriter::class)->writeAiResult(
+        media: $media,
+        validated: $validated,
+        raw: ['tags' => []],
+        promptVersion: 'v2',
+        confidenceThreshold: 0.7,
+    );
+
+    $media->refresh();
+    $values = $media->mediaTags()->with('tag')->get()->pluck('tag.value')->all();
+
+    expect($values)->toEqualCanonicalizing(['students', 'lesson'])
+        ->and($media->mediaTags()->where('tag_id', $students->id)->first()?->source)->toBe(MediaTag::SOURCE_MANUAL)
+        ->and($media->mediaTags()->where('tag_id', $classroom->id)->exists())->toBeFalse()
+        ->and($media->mediaTags()->where('tag_id', $outdoors->id)->exists())->toBeFalse()
+        ->and($media->prompt_version)->toBe('v2');
+});

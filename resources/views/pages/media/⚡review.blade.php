@@ -83,15 +83,15 @@ new #[Title('Review queue')] class extends Component {
                     @forelse ($this->suggestions as $mediaTag)
                         <tr wire:key="review-{{ $mediaTag->id }}">
                             <td class="px-4 py-3">
-                                <div class="flex items-center gap-3">
+                                <a href="{{ route('gallery', ['media' => $mediaTag->media_id]) }}" class="flex items-center gap-3 hover:opacity-80">
                                     @if ($mediaTag->media?->thumb_path)
                                         <img src="{{ route('media.thumbnail', $mediaTag->media) }}" alt="" class="size-12 rounded object-cover" />
                                     @endif
                                     <div>
                                         <div class="font-medium">{{ $mediaTag->media?->name }}</div>
-                                        <div class="text-xs text-zinc-500">#{{ $mediaTag->media_id }}</div>
+                                        <div class="text-xs text-zinc-500">#{{ $mediaTag->media_id }} · {{ __('Open in gallery') }}</div>
                                     </div>
-                                </div>
+                                </a>
                             </td>
                             <td class="px-4 py-3">
                                 {{ $mediaTag->tag->category->label_en }}: {{ $mediaTag->tag->label_en }}
@@ -101,6 +101,7 @@ new #[Title('Review queue')] class extends Component {
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex justify-end gap-2">
+                                    <flux:button size="sm" variant="ghost" href="{{ route('gallery', ['media' => $mediaTag->media_id]) }}">{{ __('Inspect') }}</flux:button>
                                     <flux:button size="sm" variant="primary" wire:click="confirmTag({{ $mediaTag->id }})">{{ __('Confirm') }}</flux:button>
                                     <flux:button size="sm" variant="danger" wire:click="rejectTag({{ $mediaTag->id }})">{{ __('Reject') }}</flux:button>
                                 </div>
@@ -127,7 +128,9 @@ new #[Title('Review queue')] class extends Component {
                 <div wire:key="suggestion-{{ $index }}" class="rounded-lg border border-zinc-200 px-4 py-3 dark:border-zinc-700">
                     <div class="font-medium">{{ $row['category'] }}: {{ $row['value'] }}</div>
                     <div class="text-sm text-zinc-500">
-                        {{ $row['media']->name }}
+                        <a href="{{ route('gallery', ['media' => $row['media']->id]) }}" class="underline hover:no-underline">
+                            {{ $row['media']->name }}
+                        </a>
                         @if ($row['reason'])
                             · {{ $row['reason'] }}
                         @endif

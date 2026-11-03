@@ -6,11 +6,9 @@ namespace App\Jobs;
 
 use App\Models\Media;
 use App\Models\TagRun;
-use App\Services\GoogleDrive\DriveSyncService;
-use App\Services\Tagging\AiTagResponseValidator;
-use App\Services\Tagging\ClaudeMediaTagger;
 use App\Services\Tagging\FolderContextTagger;
 use App\Services\Tagging\MediaTagWriter;
+use App\Services\Tagging\TaggingPreview;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -32,10 +30,8 @@ class TagMedia implements ShouldQueue
     public function __construct(public int $mediaId) {}
 
     public function handle(
-        DriveSyncService $driveSync,
         FolderContextTagger $folderContextTagger,
-        ClaudeMediaTagger $claudeMediaTagger,
-        AiTagResponseValidator $validator,
+        TaggingPreview $taggingPreview,
         MediaTagWriter $writer,
     ): void {
         $media = Media::query()->with('folder')->find($this->mediaId);
@@ -65,26 +61,22 @@ class TagMedia implements ShouldQueue
         ]);
 
         try {
-            $imageBytes = $driveSync->downloadThumbnailBytes(
-                $media->drive_file_id,
-                (int) config('media.ai.vision_max_edge', 1600),
-            );
-
-            $result = $claudeMediaTagger->tag($media, $imageBytes);
-            $validated = $validator->validate($result['structured']);
+            $preview = $taggingPreview->preview($media);
 
             $writer->writeAiResult(
                 media: $media,
-                validated: $validated,
-                raw: $result['structured'],
-                promptVersion: $result['prompt_version'],
+                validated: $preview['validated'],
+                raw: $preview['structured'],
+                promptVersion: $preview['prompt_version'],
                 confidenceThreshold: (float) config('media.ai.confidence_threshold', 0.7),
             );
 
             $tagRun->forceFill([
                 'status' => TagRun::STATUS_SUCCEEDED,
-                'input_tokens' => $result['input_tokens'],
-                'output_tokens' => $result['output_tokens'],
+                'model' => $preview['model'],
+                'prompt_version' => $preview['prompt_version'],
+                'input_tokens' => $preview['input_tokens'],
+                'output_tokens' => $preview['output_tokens'],
                 'error' => null,
             ])->save();
         } catch (PrismRateLimitedException $e) {
