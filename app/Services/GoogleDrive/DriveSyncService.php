@@ -156,6 +156,21 @@ final class DriveSyncService
         return in_array($mimeType, $allowed, true);
     }
 
+    public function downloadOriginalBytes(string $driveFileId): string
+    {
+        /** @var ResponseInterface|string $response */
+        $response = $this->drive->files->get($driveFileId, [
+            'alt' => 'media',
+            'supportsAllDrives' => true,
+        ]);
+
+        if (is_string($response)) {
+            return $response;
+        }
+
+        return (string) $response->getBody();
+    }
+
     public function downloadThumbnailBytes(string $driveFileId, int $preferredSize = 1600): string
     {
         $file = $this->drive->files->get($driveFileId, [

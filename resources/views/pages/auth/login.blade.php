@@ -1,9 +1,29 @@
 <x-layouts::auth :title="__('Log in')">
     <div class="flex flex-col gap-6">
-        <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" />
+        <x-auth-header :title="__('Log in to your account')" :description="__('TALMA staff: use your @talmaisrael.com Google account')" />
 
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
+
+        @if ($errors->any())
+            <flux:callout variant="danger">
+                {{ $errors->first() }}
+            </flux:callout>
+        @endif
+
+        <flux:button
+            href="{{ route('auth.google') }}"
+            variant="primary"
+            class="w-full"
+            icon="globe-alt"
+            data-test="google-login-button"
+        >
+            {{ __('Continue with Google') }}
+        </flux:button>
+
+        <div class="relative text-center text-sm text-zinc-500">
+            <span>{{ __('or use email') }}</span>
+        </div>
 
         <x-passkey-verify />
 
